@@ -17,6 +17,17 @@
       border-radius: 5px;
       line-height: 1.5em;
     }
+    #scoreboard {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 18px;
+      display: none;
+    }
   </style>
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
   <script src="https://cdn.babylonjs.com/cannon.js"></script>
@@ -27,6 +38,9 @@
     <div><strong>Time:</strong> <span id="time">30</span>s</div>
     <div><strong>Players Online:</strong> <span id="players">1</span></div>
   </div>
+  <div id="scoreboard">
+    <strong>🏆 Final Score:</strong> <span id="finalScore"></span>
+  </div>
   <canvas id="renderCanvas"></canvas>
 
   <script>
@@ -34,22 +48,29 @@
     const engine = new BABYLON.Engine(canvas, true);
     const scene = new BABYLON.Scene(engine);
 
-    // HUD elements
     let score = 0;
     let timeLeft = 30;
     const scoreText = document.getElementById("score");
     const timeText = document.getElementById("time");
     const playersText = document.getElementById("players");
+    const scoreboard = document.getElementById("scoreboard");
+    const finalScoreText = document.getElementById("finalScore");
 
-    // Camera and light
     const camera = new BABYLON.ArcRotateCamera("cam", Math.PI / 2, Math.PI / 3, 15, BABYLON.Vector3.Zero(), scene);
     camera.attachControl(canvas, true);
-    const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1, 1, 0), scene);
 
-    // Physics
+    const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1, 1, 0), scene);
     scene.enablePhysics(new BABYLON.Vector3(0, -9.8, 0), new BABYLON.CannonJSPlugin());
 
-    // Terrain using procedural heightmap
+    // Dynamic lighting & sky color
+    scene.registerBeforeRender(() => {
+      const time = performance.now() / 5000;
+      const intensity = Math.abs(Math.sin(time));
+      light.intensity = 0.3 + intensity * 0.7;
+      scene.clearColor = new BABYLON.Color4(0.2 + 0.5 * intensity, 0.4 + 0.5 * intensity, 0.6 + 0.3 * intensity, 1);
+    });
+
+    // Terrain with height variation
     const ground = BABYLON.MeshBuilder.CreateGroundFromHeightMap("ground", "", {
       width: 20,
       height: 20,
@@ -57,22 +78,16 @@
       minHeight: 0,
       maxHeight: 2,
       onReady: () => {
-        ground.physicsImpostor = new BABYLON.PhysicsImpostor(
-          ground,
-          BABYLON.PhysicsImpostor.HeightmapImpostor,
-          { mass: 0 },
-          scene
-        );
+        ground.physicsImpostor = new BABYLON.PhysicsImpostor(ground, BABYLON.PhysicsImpostor.HeightmapImpostor, { mass: 0 });
       }
     }, scene);
     const groundMat = new BABYLON.StandardMaterial("groundMat", scene);
     groundMat.diffuseColor = new BABYLON.Color3(0.3, 0.6, 0.3);
     ground.material = groundMat;
 
-    // Ball spawner
     function spawnSphere() {
       const sphere = BABYLON.MeshBuilder.CreateSphere("sphere", { diameter: 1 }, scene);
-      sphere.position = new BABYLON.Vector3(Math.random() * 8 - 4, 2 + Math.random() * 3, Math.random() * 8 - 4);
+      sphere.position = new BABYLON.Vector3(Math.random() * 8 - 4, 4 + Math.random() * 3, Math.random() * 8 - 4);
       sphere.physicsImpostor = new BABYLON.PhysicsImpostor(sphere, BABYLON.PhysicsImpostor.SphereImpostor, {
         mass: 1, restitution: 0.9
       });
@@ -85,6 +100,7 @@
         if (pointerInfo.pickInfo?.pickedMesh === sphere) {
           score++;
           scoreText.textContent = score;
+          spawnParticles(sphere.position);
           sphere.dispose();
 
           if (socket.readyState === WebSocket.OPEN) {
@@ -94,14 +110,29 @@
       });
     }
 
-    // Power-up cube
+    function spawnParticles(position) {
+      const particles = new BABYLON.ParticleSystem("particles", 100, scene);
+      particles.particleTexture = new BABYLON.Texture("https://playground.babylonjs.com/textures/flare.png", scene);
+      particles.emitter = position.clone();
+      particles.minSize = 0.1;
+      particles.maxSize = 0.3;
+      particles.color1 = new BABYLON.Color4(1, 1, 0.3, 1);
+      particles.color2 = new BABYLON.Color4(1, 0.5, 0.2, 1);
+      particles.minLifeTime = 0.2;
+      particles.maxLifeTime = 0.5;
+      particles.emitRate = 1000;
+      particles.gravity = new BABYLON.Vector3(0, -9.8, 0);
+      particles.disposeOnStop = true;
+      particles.start();
+      setTimeout(() => particles.stop(), 200);
+    }
+
     function spawnPowerUp() {
       const box = BABYLON.MeshBuilder.CreateBox("powerup", { size: 0.7 }, scene);
       box.position = new BABYLON.Vector3(Math.random() * 6 - 3, 1.5, Math.random() * 6 - 3);
       box.material = new BABYLON.StandardMaterial("mat", scene);
       box.material.diffuseColor = new BABYLON.Color3(0, 1, 0);
 
-      // Hover animation
       scene.onBeforeRenderObservable.add(() => {
         box.rotation.y += 0.03;
         box.position.y += Math.sin(performance.now() / 200) * 0.002;
@@ -118,7 +149,6 @@
       });
     }
 
-    // Game timer
     const gameInterval = setInterval(() => {
       timeLeft--;
       timeText.textContent = timeLeft;
@@ -126,21 +156,13 @@
       if (timeLeft % 10 === 0) spawnPowerUp();
       if (timeLeft <= 0) {
         clearInterval(gameInterval);
-        alert("Game Over! Final Score: " + score);
+        finalScoreText.textContent = score;
+        scoreboard.style.display = "block";
       }
     }, 1000);
 
     engine.runRenderLoop(() => scene.render());
     window.addEventListener("resize", () => engine.resize());
 
-    // WebSocket multiplayer
     const socket = new WebSocket("wss://public-babylonjs-game.onrender.com");
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "players") {
-        playersText.textContent = data.count;
-      }
-    };
-  </script>
-</body>
-</html>
+    socket.onmessage
