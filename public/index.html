@@ -28,141 +28,171 @@
       font-size: 18px;
       display: none;
     }
+    body::after {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.03),
+        rgba(255,255,255,0.03) 1px,
+        transparent 1px,
+        transparent 2px
+      );
+      z-index: 1000;
+    }
   </style>
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
   <script src="https://cdn.babylonjs.com/cannon.js"></script>
 </head>
 <body>
+  <div id="nameOverlay" style="position:absolute;top:0;left:0;width:100%;height:100%;background:black;color:white;display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:10;">
+    <h2>Enter Your Name</h2>
+    <input type="text" id="playerNameInput" placeholder="Player 1" style="font-size:20px;padding:10px;">
+    <button onclick="startGame()" style="margin-top:10px;font-size:18px;">Play</button>
+  </div>
+
   <div id="hud">
     <div><strong>Score:</strong> <span id="score">0</span></div>
     <div><strong>Time:</strong> <span id="time">30</span>s</div>
     <div><strong>Players Online:</strong> <span id="players">1</span></div>
   </div>
+
   <div id="scoreboard">
     <strong>🏆 Final Score:</strong> <span id="finalScore"></span>
   </div>
+
   <canvas id="renderCanvas"></canvas>
 
   <script>
-    const canvas = document.getElementById("renderCanvas");
-    const engine = new BABYLON.Engine(canvas, true);
-    const scene = new BABYLON.Scene(engine);
+    let playerName = "Anonymous";
 
-    let score = 0;
-    let timeLeft = 30;
-    const scoreText = document.getElementById("score");
-    const timeText = document.getElementById("time");
-    const playersText = document.getElementById("players");
-    const scoreboard = document.getElementById("scoreboard");
-    const finalScoreText = document.getElementById("finalScore");
+    function startGame() {
+      const input = document.getElementById("playerNameInput");
+      playerName = input.value.trim() || "Player";
+      document.getElementById("nameOverlay").style.display = "none";
+      initGame();
+    }
 
-    const camera = new BABYLON.ArcRotateCamera("cam", Math.PI / 2, Math.PI / 3, 15, BABYLON.Vector3.Zero(), scene);
-    camera.attachControl(canvas, true);
+    function initGame() {
+      const canvas = document.getElementById("renderCanvas");
+      const engine = new BABYLON.Engine(canvas, true);
+      const scene = new BABYLON.Scene(engine);
 
-    const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1, 1, 0), scene);
-    scene.enablePhysics(new BABYLON.Vector3(0, -9.8, 0), new BABYLON.CannonJSPlugin());
+      let score = 0;
+      let timeLeft = 30;
+      const scoreText = document.getElementById("score");
+      const timeText = document.getElementById("time");
+      const playersText = document.getElementById("players");
+      const scoreboard = document.getElementById("scoreboard");
+      const finalScoreText = document.getElementById("finalScore");
 
-    // Dynamic lighting & sky color
-    scene.registerBeforeRender(() => {
-      const time = performance.now() / 5000;
-      const intensity = Math.abs(Math.sin(time));
-      light.intensity = 0.3 + intensity * 0.7;
-      scene.clearColor = new BABYLON.Color4(0.2 + 0.5 * intensity, 0.4 + 0.5 * intensity, 0.6 + 0.3 * intensity, 1);
-    });
+      const camera = new BABYLON.ArcRotateCamera("cam", Math.PI / 2, Math.PI / 3, 15, BABYLON.Vector3.Zero(), scene);
+      camera.attachControl(canvas, true);
+      const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1, 1, 0), scene);
 
-    // Terrain with height variation
-    const ground = BABYLON.MeshBuilder.CreateGroundFromHeightMap("ground", "", {
-      width: 20,
-      height: 20,
-      subdivisions: 50,
-      minHeight: 0,
-      maxHeight: 2,
-      onReady: () => {
-        ground.physicsImpostor = new BABYLON.PhysicsImpostor(ground, BABYLON.PhysicsImpostor.HeightmapImpostor, { mass: 0 });
-      }
-    }, scene);
-    const groundMat = new BABYLON.StandardMaterial("groundMat", scene);
-    groundMat.diffuseColor = new BABYLON.Color3(0.3, 0.6, 0.3);
-    ground.material = groundMat;
+      scene.enablePhysics(new BABYLON.Vector3(0, -9.8, 0), new BABYLON.CannonJSPlugin());
 
-    function spawnSphere() {
-      const sphere = BABYLON.MeshBuilder.CreateSphere("sphere", { diameter: 1 }, scene);
-      sphere.position = new BABYLON.Vector3(Math.random() * 8 - 4, 4 + Math.random() * 3, Math.random() * 8 - 4);
-      sphere.physicsImpostor = new BABYLON.PhysicsImpostor(sphere, BABYLON.PhysicsImpostor.SphereImpostor, {
-        mass: 1, restitution: 0.9
+      scene.registerBeforeRender(() => {
+        const t = performance.now() / 5000;
+        const intensity = Math.abs(Math.sin(t));
+        light.intensity = 0.3 + intensity * 0.7;
+        scene.clearColor = new BABYLON.Color4(0.2 + 0.5 * intensity, 0.4 + 0.5 * intensity, 0.6 + 0.3 * intensity, 1);
       });
 
-      const mat = new BABYLON.StandardMaterial("ballMat", scene);
-      mat.diffuseColor = new BABYLON.Color3(Math.random(), Math.random(), Math.random());
-      sphere.material = mat;
+      const ground = BABYLON.MeshBuilder.CreateGroundFromHeightMap("ground", "", {
+        width: 20,
+        height: 20,
+        subdivisions: 50,
+        minHeight: 0,
+        maxHeight: 2,
+        onReady: () => {
+          ground.physicsImpostor = new BABYLON.PhysicsImpostor(
+            ground,
+            BABYLON.PhysicsImpostor.HeightmapImpostor,
+            { mass: 0 },
+            scene
+          );
+        }
+      }, scene);
 
-      scene.onPointerObservable.add((pointerInfo) => {
-        if (pointerInfo.pickInfo?.pickedMesh === sphere) {
-          score++;
-          scoreText.textContent = score;
-          spawnParticles(sphere.position);
-          sphere.dispose();
+      const groundMat = new BABYLON.StandardMaterial("groundMat", scene);
+      groundMat.diffuseColor = new BABYLON.Color3(0.3, 0.6, 0.3);
+      ground.material = groundMat;
 
-          if (socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ type: "score", value: score }));
+      function spawnSphere() {
+        const sphere = BABYLON.MeshBuilder.CreateSphere("sphere", { diameter: 1 }, scene);
+        sphere.position = new BABYLON.Vector3(Math.random() * 8 - 4, 4 + Math.random() * 3, Math.random() * 8 - 4);
+        sphere.physicsImpostor = new BABYLON.PhysicsImpostor(sphere, BABYLON.PhysicsImpostor.SphereImpostor, {
+          mass: 1, restitution: 0.9
+        });
+
+        const mat = new BABYLON.StandardMaterial("ballMat", scene);
+        mat.diffuseColor = new BABYLON.Color3(Math.random(), Math.random(), Math.random());
+        sphere.material = mat;
+
+        scene.onPointerObservable.add((pointerInfo) => {
+          if (pointerInfo.pickInfo?.pickedMesh === sphere) {
+            score++;
+            scoreText.textContent = score;
+            spawnParticles(sphere.position);
+            sphere.dispose();
+            if (socket.readyState === WebSocket.OPEN) {
+              socket.send(JSON.stringify({ type: "score", value: score }));
+            }
           }
-        }
-      });
-    }
-
-    function spawnParticles(position) {
-      const particles = new BABYLON.ParticleSystem("particles", 100, scene);
-      particles.particleTexture = new BABYLON.Texture("https://playground.babylonjs.com/textures/flare.png", scene);
-      particles.emitter = position.clone();
-      particles.minSize = 0.1;
-      particles.maxSize = 0.3;
-      particles.color1 = new BABYLON.Color4(1, 1, 0.3, 1);
-      particles.color2 = new BABYLON.Color4(1, 0.5, 0.2, 1);
-      particles.minLifeTime = 0.2;
-      particles.maxLifeTime = 0.5;
-      particles.emitRate = 1000;
-      particles.gravity = new BABYLON.Vector3(0, -9.8, 0);
-      particles.disposeOnStop = true;
-      particles.start();
-      setTimeout(() => particles.stop(), 200);
-    }
-
-    function spawnPowerUp() {
-      const box = BABYLON.MeshBuilder.CreateBox("powerup", { size: 0.7 }, scene);
-      box.position = new BABYLON.Vector3(Math.random() * 6 - 3, 1.5, Math.random() * 6 - 3);
-      box.material = new BABYLON.StandardMaterial("mat", scene);
-      box.material.diffuseColor = new BABYLON.Color3(0, 1, 0);
-
-      scene.onBeforeRenderObservable.add(() => {
-        box.rotation.y += 0.03;
-        box.position.y += Math.sin(performance.now() / 200) * 0.002;
-      });
-
-      setTimeout(() => box.dispose(), 10000);
-
-      scene.onPointerObservable.add((pointerInfo) => {
-        if (pointerInfo.pickInfo?.pickedMesh === box) {
-          timeLeft += 5;
-          timeText.textContent = timeLeft;
-          box.dispose();
-        }
-      });
-    }
-
-    const gameInterval = setInterval(() => {
-      timeLeft--;
-      timeText.textContent = timeLeft;
-      spawnSphere();
-      if (timeLeft % 10 === 0) spawnPowerUp();
-      if (timeLeft <= 0) {
-        clearInterval(gameInterval);
-        finalScoreText.textContent = score;
-        scoreboard.style.display = "block";
+        });
       }
-    }, 1000);
 
-    engine.runRenderLoop(() => scene.render());
-    window.addEventListener("resize", () => engine.resize());
+      function spawnParticles(position) {
+        const particles = new BABYLON.ParticleSystem("particles", 100, scene);
+        particles.particleTexture = new BABYLON.Texture("https://playground.babylonjs.com/textures/flare.png", scene);
+        particles.emitter = position.clone();
+        particles.minSize = 0.1;
+        particles.maxSize = 0.3;
+        particles.color1 = new BABYLON.Color4(1, 1, 0.3, 1);
+        particles.color2 = new BABYLON.Color4(1, 0.5, 0.2, 1);
+        particles.minLifeTime = 0.2;
+        particles.maxLifeTime = 0.5;
+        particles.emitRate = 1000;
+        particles.gravity = new BABYLON.Vector3(0, -9.8, 0);
+        particles.disposeOnStop = true;
+        particles.start();
+        setTimeout(() => particles.stop(), 200);
+      }
 
-    const socket = new WebSocket("wss://public-babylonjs-game.onrender.com");
-    socket.onmessage
+      function spawnPowerUp() {
+        const box = BABYLON.MeshBuilder.CreateBox("powerup", { size: 0.7 }, scene);
+        box.position = new BABYLON.Vector3(Math.random() * 6 - 3, 1.5, Math.random() * 6 - 3);
+        box.material = new BABYLON.StandardMaterial("mat", scene);
+        box.material.diffuseColor = new BABYLON.Color3(0, 1, 0);
+
+        scene.onBeforeRenderObservable.add(() => {
+          box.rotation.y += 0.03;
+          box.position.y += Math.sin(performance.now() / 200) * 0.002;
+        });
+
+        setTimeout(() => box.dispose(), 10000);
+
+        scene.onPointerObservable.add((pointerInfo) => {
+          if (pointerInfo.pickInfo?.pickedMesh === box) {
+            timeLeft += 5;
+            timeText.textContent = timeLeft;
+            box.dispose();
+          }
+        });
+      }
+
+      const gameInterval = setInterval(() => {
+        timeLeft--;
+        timeText.textContent = timeLeft;
+        spawnSphere();
+        if (timeLeft % 10 === 0) spawnPowerUp();
+        if (timeLeft <= 0) {
+          clearInterval(gameInterval);
+          finalScoreText.textContent = score;
+          scoreboard.style.display = "block";
+
+          const leaderboard = JSON.parse(localStorage.getItem("leaderboard") || "
