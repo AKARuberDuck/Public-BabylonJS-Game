@@ -8,7 +8,7 @@ server.on('connection', socket => {
   broadcastPlayerCount();
 
   socket.on('message', data => {
-    broadcast(data, socket); // echo scores or any game state
+    broadcast(data, socket);
   });
 
   socket.on('close', () => {
