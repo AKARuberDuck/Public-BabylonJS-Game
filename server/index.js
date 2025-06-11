@@ -1,21 +1,31 @@
 const WebSocket = require('ws');
 const server = new WebSocket.Server({ port: process.env.PORT || 8080 });
 
-let clients = [];
+let players = new Set();
 
 server.on('connection', socket => {
-  clients.push(socket);
-  socket.send(JSON.stringify({ message: "Welcome to the game lobby!" }));
+  players.add(socket);
+  broadcastPlayerCount();
 
   socket.on('message', data => {
-    clients.forEach(client => {
-      if (client !== socket && client.readyState === WebSocket.OPEN) {
-        client.send(data);
-      }
-    });
+    broadcast(data, socket); // echo scores or any game state
   });
 
   socket.on('close', () => {
-    clients = clients.filter(c => c !== socket);
+    players.delete(socket);
+    broadcastPlayerCount();
   });
 });
+
+function broadcastPlayerCount() {
+  const message = JSON.stringify({ type: 'players', count: players.size });
+  for (let p of players) {
+    if (p.readyState === WebSocket.OPEN) p.send(message);
+  }
+}
+
+function broadcast(data, exclude) {
+  for (let p of players) {
+    if (p !== exclude && p.readyState === WebSocket.OPEN) p.send(data);
+  }
+}
