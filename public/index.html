@@ -64,7 +64,26 @@
       playerName = document.getElementById("playerNameInput").value.trim() || "Player";
       timeLeft = parseInt(document.getElementById("gameTime").value) || 30;
       document.getElementById("nameOverlay").style.display = "none";
-      initGame();
+      initGame(){
+        function spawnHazard() {
+  const enemy = BABYLON.MeshBuilder.CreateBox("enemy", { size: 1 }, scene);
+  enemy.position = new BABYLON.Vector3(Math.random() * 14 - 7, 0.5, Math.random() * 14 - 7);
+  enemy.material = new BABYLON.StandardMaterial("enemyMat", scene);
+  enemy.material.diffuseColor = new BABYLON.Color3(1, 0, 0);
+
+  const dir = new BABYLON.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize().scale(0.1);
+
+  scene.onBeforeRenderObservable.add(() => {
+    enemy.position.addInPlace(dir);
+    if (BABYLON.Vector3.Distance(enemy.position, player.position) < 1.1) {
+      score = Math.max(0, score - 1);
+      scoreText.textContent = score;
+    }
+  });
+}
+setInterval(spawnHazard, 7000);
+
+      };
     }
 
     function initGame() {
