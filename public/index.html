@@ -34,26 +34,52 @@
     const engine = new BABYLON.Engine(canvas, true);
     const scene = new BABYLON.Scene(engine);
 
+    // HUD elements
     let score = 0;
     let timeLeft = 30;
-
     const scoreText = document.getElementById("score");
     const timeText = document.getElementById("time");
     const playersText = document.getElementById("players");
 
-    const camera = new BABYLON.ArcRotateCamera("camera", Math.PI / 2, Math.PI / 3, 10, BABYLON.Vector3.Zero(), scene);
+    // Camera and light
+    const camera = new BABYLON.ArcRotateCamera("cam", Math.PI / 2, Math.PI / 3, 15, BABYLON.Vector3.Zero(), scene);
     camera.attachControl(canvas, true);
     const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1, 1, 0), scene);
 
+    // Physics
     scene.enablePhysics(new BABYLON.Vector3(0, -9.8, 0), new BABYLON.CannonJSPlugin());
 
-    const ground = BABYLON.MeshBuilder.CreateGround("ground", {width: 10, height: 10}, scene);
-    ground.physicsImpostor = new BABYLON.PhysicsImpostor(ground, BABYLON.PhysicsImpostor.BoxImpostor, { mass: 0 });
+    // Terrain using procedural heightmap
+    const ground = BABYLON.MeshBuilder.CreateGroundFromHeightMap("ground", "", {
+      width: 20,
+      height: 20,
+      subdivisions: 50,
+      minHeight: 0,
+      maxHeight: 2,
+      onReady: () => {
+        ground.physicsImpostor = new BABYLON.PhysicsImpostor(
+          ground,
+          BABYLON.PhysicsImpostor.HeightmapImpostor,
+          { mass: 0 },
+          scene
+        );
+      }
+    }, scene);
+    const groundMat = new BABYLON.StandardMaterial("groundMat", scene);
+    groundMat.diffuseColor = new BABYLON.Color3(0.3, 0.6, 0.3);
+    ground.material = groundMat;
 
+    // Ball spawner
     function spawnSphere() {
       const sphere = BABYLON.MeshBuilder.CreateSphere("sphere", { diameter: 1 }, scene);
-      sphere.position = new BABYLON.Vector3(Math.random() * 6 - 3, 2 + Math.random() * 3, Math.random() * 6 - 3);
-      sphere.physicsImpostor = new BABYLON.PhysicsImpostor(sphere, BABYLON.PhysicsImpostor.SphereImpostor, { mass: 1, restitution: 0.9 });
+      sphere.position = new BABYLON.Vector3(Math.random() * 8 - 4, 2 + Math.random() * 3, Math.random() * 8 - 4);
+      sphere.physicsImpostor = new BABYLON.PhysicsImpostor(sphere, BABYLON.PhysicsImpostor.SphereImpostor, {
+        mass: 1, restitution: 0.9
+      });
+
+      const mat = new BABYLON.StandardMaterial("ballMat", scene);
+      mat.diffuseColor = new BABYLON.Color3(Math.random(), Math.random(), Math.random());
+      sphere.material = mat;
 
       scene.onPointerObservable.add((pointerInfo) => {
         if (pointerInfo.pickInfo?.pickedMesh === sphere) {
@@ -61,7 +87,6 @@
           scoreText.textContent = score;
           sphere.dispose();
 
-          // (Optional) Broadcast score
           if (socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({ type: "score", value: score }));
           }
@@ -69,11 +94,19 @@
       });
     }
 
+    // Power-up cube
     function spawnPowerUp() {
       const box = BABYLON.MeshBuilder.CreateBox("powerup", { size: 0.7 }, scene);
       box.position = new BABYLON.Vector3(Math.random() * 6 - 3, 1.5, Math.random() * 6 - 3);
       box.material = new BABYLON.StandardMaterial("mat", scene);
       box.material.diffuseColor = new BABYLON.Color3(0, 1, 0);
+
+      // Hover animation
+      scene.onBeforeRenderObservable.add(() => {
+        box.rotation.y += 0.03;
+        box.position.y += Math.sin(performance.now() / 200) * 0.002;
+      });
+
       setTimeout(() => box.dispose(), 10000);
 
       scene.onPointerObservable.add((pointerInfo) => {
@@ -85,7 +118,29 @@
       });
     }
 
+    // Game timer
     const gameInterval = setInterval(() => {
       timeLeft--;
       timeText.textContent = timeLeft;
       spawnSphere();
+      if (timeLeft % 10 === 0) spawnPowerUp();
+      if (timeLeft <= 0) {
+        clearInterval(gameInterval);
+        alert("Game Over! Final Score: " + score);
+      }
+    }, 1000);
+
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener("resize", () => engine.resize());
+
+    // WebSocket multiplayer
+    const socket = new WebSocket("wss://public-babylonjs-game.onrender.com");
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "players") {
+        playersText.textContent = data.count;
+      }
+    };
+  </script>
+</body>
+</html>
