@@ -156,3 +156,61 @@
 
       const goal = BABYLON.MeshBuilder.CreateDisc("goal", { radius: 1 }, scene);
       goal
+      goal.rotation.x = Math.PI / 2;
+      goal.position = new BABYLON.Vector3(8, 0.05, 8);
+      goal.material = new BABYLON.StandardMaterial("goalMat", scene);
+      goal.material.diffuseColor = new BABYLON.Color3(0, 1, 1);
+
+      // Game loop
+      const gameInterval = setInterval(() => {
+        timeLeft--;
+        timeText.textContent = timeLeft;
+
+        if (BABYLON.Vector3.Distance(goal.position, player.position) < 1) {
+          endGame("🎯 You Win!");
+        }
+
+        if (timeLeft <= 0) {
+          endGame("⏱️ Time's Up!");
+        }
+      }, 1000);
+
+      function endGame(message) {
+        clearInterval(gameInterval);
+        finalScoreText.textContent = score;
+        scoreboard.style.display = "block";
+
+        const leaderboard = JSON.parse(localStorage.getItem("leaderboard") || "[]");
+        leaderboard.push({ name: playerName, score });
+        leaderboard.sort((a, b) => b.score - a.score);
+        localStorage.setItem("leaderboard", JSON.stringify(leaderboard.slice(0, 5)));
+
+        const boardHTML = leaderboard
+          .slice(0, 5)
+          .map((p, i) => `<div>${i + 1}. ${p.name}: ${p.score}</div>`)
+          .join("");
+
+        scoreboard.innerHTML += `<hr><strong>${message}</strong>`;
+        scoreboard.innerHTML += `<hr><strong>Leaderboard:</strong><div>${boardHTML}</div>`;
+        scoreboard.innerHTML += `<br><em>Press SPACE to restart</em>`;
+
+        document.addEventListener("keydown", (e) => {
+          if (e.code === "Space") location.reload();
+        });
+      }
+
+      // Multiplayer WebSocket
+      const socket = new WebSocket("wss://public-babylonjs-game.onrender.com");
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === "players") {
+          playersText.textContent = data.count;
+        }
+      };
+
+      engine.runRenderLoop(() => scene.render());
+      window.addEventListener("resize", () => engine.resize());
+    }
+  </script>
+</body>
+</html>
