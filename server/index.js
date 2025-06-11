@@ -1,31 +1,37 @@
-const WebSocket = require('ws');
-const server = new WebSocket.Server({ port: process.env.PORT || 8080 });
+const express = require("express");
+const path = require("path");
+const http = require("http");
+const WebSocket = require("ws");
 
-let players = new Set();
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
 
-server.on('connection', socket => {
-  players.add(socket);
-  broadcastPlayerCount();
+let clients = new Set();
 
-  socket.on('message', data => {
-    broadcast(data, socket);
-  });
+wss.on("connection", (ws) => {
+  clients.add(ws);
+  broadcast({ type: "players", count: clients.size });
 
-  socket.on('close', () => {
-    players.delete(socket);
-    broadcastPlayerCount();
+  ws.on("close", () => {
+    clients.delete(ws);
+    broadcast({ type: "players", count: clients.size });
   });
 });
 
-function broadcastPlayerCount() {
-  const message = JSON.stringify({ type: 'players', count: players.size });
-  for (let p of players) {
-    if (p.readyState === WebSocket.OPEN) p.send(message);
+function broadcast(message) {
+  const data = JSON.stringify(message);
+  for (let ws of clients) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(data);
+    }
   }
 }
 
-function broadcast(data, exclude) {
-  for (let p of players) {
-    if (p !== exclude && p.readyState === WebSocket.OPEN) p.send(data);
-  }
-}
+// Serve static files
+app.use(express.static(path.join(__dirname, "../public")));
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server and WebSocket running on port ${PORT}`);
+});
