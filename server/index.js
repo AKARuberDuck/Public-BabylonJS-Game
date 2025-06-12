@@ -7,15 +7,15 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Serve static files from /public
+// ✅ Serve static files from ../public
 app.use(express.static(path.join(__dirname, "../public")));
 
-// Fallback route to index.html for any unknown path
+// ✅ Catch-all for browser routes (sends index.html)
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../public/index.html"));
 });
 
-// WebSocket logic
+// ✅ WebSocket logic (optional player counter)
 let clients = new Set();
 
 wss.on("connection", (ws) => {
@@ -28,16 +28,15 @@ wss.on("connection", (ws) => {
   });
 });
 
-function broadcast(message) {
-  const data = JSON.stringify(message);
-  for (let ws of clients) {
+function broadcast(data) {
+  const message = JSON.stringify(data);
+  clients.forEach((ws) => {
     if (ws.readyState === WebSocket.OPEN) {
-      ws.send(data);
+      ws.send(message);
     }
-  }
+  });
 }
 
-// Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`🚀 Server + WebSocket running at http://localhost:${PORT}`);
