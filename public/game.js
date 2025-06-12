@@ -1,6 +1,7 @@
 window.addEventListener("DOMContentLoaded", function () {
   const canvas = document.getElementById("renderCanvas");
   const engine = new BABYLON.Engine(canvas, true);
+
   let scene, player, score = 0, timer, gameTime, ws;
   let scoreEl = document.getElementById("score");
   let timeEl = document.getElementById("time");
@@ -37,7 +38,10 @@ window.addEventListener("DOMContentLoaded", function () {
     // 🧍 Player
     player = BABYLON.MeshBuilder.CreateSphere("player", { diameter: 2 }, scene);
     player.position.y = 5;
-    player.physicsImpostor = new BABYLON.PhysicsImpostor(player, BABYLON.PhysicsImpostor.SphereImpostor, { mass: 1, restitution: 0.1 }, scene);
+    player.physicsImpostor = new BABYLON.PhysicsImpostor(player, BABYLON.PhysicsImpostor.SphereImpostor, {
+      mass: 1,
+      restitution: 0.1
+    }, scene);
 
     // 🎯 Goal zone
     const goal = BABYLON.MeshBuilder.CreateDisc("goal", { radius: 2, tessellation: 32 }, scene);
