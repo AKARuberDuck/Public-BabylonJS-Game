@@ -12,6 +12,18 @@ window.addEventListener("DOMContentLoaded", function () {
   function createScene() {
     scene = new BABYLON.Scene(engine);
     scene.enablePhysics();
+    // 🎶 Background Music
+const music = new BABYLON.Sound(
+  "backgroundMusic",
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+  scene,
+  null,
+  {
+    loop: true,
+    autoplay: true,
+    volume: 0.3
+  }
+);
     scene.gravity = new BABYLON.Vector3(0, -0.5, 0);
 
     const camera = new BABYLON.ArcRotateCamera("camera", Math.PI / 2.5, Math.PI / 2.7, 30, BABYLON.Vector3.Zero(), scene);
