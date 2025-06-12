@@ -1,7 +1,8 @@
 window.addEventListener("DOMContentLoaded", function () {
   const canvas = document.getElementById("renderCanvas");
   const engine = new BABYLON.Engine(canvas, true);
-  let scene, player, goalZone, score = 0, timer, gameTime, ws;
+  let scene, score = 0, timer, gameTime, ws;
+  let playerParts = {}, powerUps = [];
 
   const scoreEl = document.getElementById("score");
   const timeEl = document.getElementById("time");
@@ -14,86 +15,102 @@ window.addEventListener("DOMContentLoaded", function () {
     scene.enablePhysics();
     scene.gravity = new BABYLON.Vector3(0, -0.5, 0);
 
-    const camera = new BABYLON.ArcRotateCamera(
-      "camera",
-      Math.PI / 2.5,
-      Math.PI / 2.7,
-      30,
-      BABYLON.Vector3.Zero(),
-      scene
-    );
+    const camera = new BABYLON.ArcRotateCamera("camera", Math.PI / 2.5, Math.PI / 2.7, 30, BABYLON.Vector3.Zero(), scene);
     camera.attachControl(canvas, true);
-
     new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
 
-    // 🌄 Ground
-    const ground = BABYLON.MeshBuilder.CreateGround(
-      "ground",
-      { width: 20, height: 20, subdivisions: 50 },
-      scene
-    );
+    // Ground
+    const ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 30, height: 30 }, scene);
     const groundMat = new BABYLON.StandardMaterial("groundMat", scene);
-    groundMat.diffuseTexture = new BABYLON.Texture(
-      "https://assets.babylonjs.com/environments/ground.jpg",
-      scene
-    );
+    groundMat.diffuseTexture = new BABYLON.Texture("https://assets.babylonjs.com/environments/ground.jpg", scene);
     groundMat.diffuseTexture.uScale = 4;
     groundMat.diffuseTexture.vScale = 4;
     ground.material = groundMat;
-    ground.physicsImpostor = new BABYLON.PhysicsImpostor(
-      ground,
-      BABYLON.PhysicsImpostor.BoxImpostor,
-      { mass: 0 },
-      scene
-    );
+    ground.physicsImpostor = new BABYLON.PhysicsImpostor(ground, BABYLON.PhysicsImpostor.BoxImpostor, { mass: 0 }, scene);
 
-    // 🎵 Music
-    const music = new BABYLON.Sound(
-      "bgMusic",
-      "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-      scene,
-      null,
-      { loop: true, autoplay: true, volume: 0.3 }
-    );
-    window.addEventListener("click", () => {
-      if (!music.isPlaying) music.play();
+    // Music
+    const music = new BABYLON.Sound("bgMusic", "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", scene, null, {
+      loop: true,
+      autoplay: true,
+      volume: 0.3
     });
+    window.addEventListener("click", () => { if (!music.isPlaying) music.play(); });
 
-    // 🧍 Player
-    player = BABYLON.MeshBuilder.CreateSphere("player", { diameter: 2 }, scene);
-    player.position = new BABYLON.Vector3(0, 5, 0);
-    player.physicsImpostor = new BABYLON.PhysicsImpostor(
-      player,
-      BABYLON.PhysicsImpostor.SphereImpostor,
-      { mass: 1, restitution: 0.2 },
-      scene
-    );
+    // Orb-based humanoid player
+    const anchor = new BABYLON.TransformNode("playerRoot", scene);
+    const mat = new BABYLON.StandardMaterial("bodyMat", scene);
+    mat.diffuseColor = new BABYLON.Color3(0.2, 0.6, 1);
 
-    // 🎯 Goal
-    goalZone = BABYLON.MeshBuilder.CreateDisc("goal", { radius: 2, tessellation: 32 }, scene);
-    goalZone.rotation.x = Math.PI / 2;
-    goalZone.position = new BABYLON.Vector3(6, 0.05, -6);
+    function makeOrb(name, pos) {
+      const orb = BABYLON.MeshBuilder.CreateSphere(name, { diameter: 1 }, scene);
+      orb.material = mat;
+      orb.parent = anchor;
+      orb.position = pos;
+      return orb;
+    }
+
+    playerParts.head = makeOrb("head", new BABYLON.Vector3(0, 3.2, 0));
+    playerParts.torso = makeOrb("torso", new BABYLON.Vector3(0, 2, 0));
+    playerParts.leftArm = makeOrb("lArm", new BABYLON.Vector3(-1, 2, 0));
+    playerParts.rightArm = makeOrb("rArm", new BABYLON.Vector3(1, 2, 0));
+    playerParts.leftLeg = makeOrb("lLeg", new BABYLON.Vector3(-0.5, 1, 0));
+    playerParts.rightLeg = makeOrb("rLeg", new BABYLON.Vector3(0.5, 1, 0));
+
+    anchor.position = new BABYLON.Vector3(0, 5, 0);
+    anchor.physicsImpostor = new BABYLON.PhysicsImpostor(anchor, BABYLON.PhysicsImpostor.SphereImpostor, { mass: 2, restitution: 0.2 }, scene);
+
+    // Goal disc
+    const goal = BABYLON.MeshBuilder.CreateDisc("goal", { radius: 2, tessellation: 32 }, scene);
+    goal.rotation.x = Math.PI / 2;
+    goal.position = new BABYLON.Vector3(6, 0.05, -6);
     const goalMat = new BABYLON.StandardMaterial("goalMat", scene);
     goalMat.diffuseColor = new BABYLON.Color3(0.2, 1, 0.2);
-    goalZone.material = goalMat;
+    goal.material = goalMat;
 
-    // 🎮 Controls
-    const input = { up: false, down: false, left: false, right: false };
-    window.addEventListener("keydown", (e) => {
+    // Power-ups
+    const powerMat = new BABYLON.StandardMaterial("powerMat", scene);
+    powerMat.emissiveColor = new BABYLON.Color3(1, 0.6, 0.2);
+
+    function spawnPowerUp() {
+      const orb = BABYLON.MeshBuilder.CreateSphere("power", { diameter: 0.8 }, scene);
+      orb.material = powerMat;
+      orb.position = new BABYLON.Vector3(
+        (Math.random() - 0.5) * 20,
+        1,
+        (Math.random() - 0.5) * 20
+      );
+      orb.actionManager = new BABYLON.ActionManager(scene);
+      orb.actionManager.registerAction(new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => {
+        orb.dispose();
+        score++;
+        scoreEl.textContent = score;
+        setTimeout(spawnPowerUp, 3000);
+      }));
+      powerUps.push(orb);
+    }
+
+    for (let i = 0; i < 5; i++) spawnPowerUp();
+
+    // Input & movement
+    const input = { up: false, down: false, left: false, right: false, jump: false };
+    window.addEventListener("keydown", e => {
       if (e.code === "ArrowUp") input.up = true;
       if (e.code === "ArrowDown") input.down = true;
       if (e.code === "ArrowLeft") input.left = true;
       if (e.code === "ArrowRight") input.right = true;
-      if (e.code === "Space" && !timer) startGame();
+      if (e.code === "Space") {
+        if (!timer) startGame();
+        else input.jump = true;
+      }
     });
-    window.addEventListener("keyup", (e) => {
+    window.addEventListener("keyup", e => {
       if (e.code === "ArrowUp") input.up = false;
       if (e.code === "ArrowDown") input.down = false;
       if (e.code === "ArrowLeft") input.left = false;
       if (e.code === "ArrowRight") input.right = false;
+      if (e.code === "Space") input.jump = false;
     });
 
-    // 🔁 Game loop
     scene.onBeforeRenderObservable.add(() => {
       if (timer) {
         const force = 3;
@@ -103,14 +120,25 @@ window.addEventListener("DOMContentLoaded", function () {
           (input.down ? 1 : 0) - (input.up ? 1 : 0)
         );
         if (!dir.equals(BABYLON.Vector3.Zero())) {
-          player.physicsImpostor.applyImpulse(dir.normalize().scale(force), player.getAbsolutePosition());
+          anchor.physicsImpostor.applyImpulse(dir.normalize().scale(force), anchor.getAbsolutePosition());
+
+          const sway = Math.sin(performance.now() * 0.005) * 0.3;
+          playerParts.leftLeg.position.z = sway;
+          playerParts.rightLeg.position.z = -sway;
+          playerParts.leftArm.position.z = -sway;
+          playerParts.rightArm.position.z = sway;
         }
 
-        const dist = BABYLON.Vector3.Distance(player.position, goalZone.position);
+        // Jump
+        if (input.jump && Math.abs(anchor.physicsImpostor.getLinearVelocity().y) < 0.05) {
+          anchor.physicsImpostor.applyImpulse(new BABYLON.Vector3(0, 4, 0), anchor.getAbsolutePosition());
+        }
+
+        const dist = BABYLON.Vector3.Distance(anchor.position, goal.position);
         if (dist < 2.5) {
           score++;
           scoreEl.textContent = score;
-          player.position = new BABYLON.Vector3(0, 5, 0);
+          anchor.position = new BABYLON.Vector3(0, 5, 0);
         }
       }
     });
@@ -123,7 +151,6 @@ window.addEventListener("DOMContentLoaded", function () {
     timeEl.textContent = gameTime;
     nameOverlay.style.display = "none";
     document.getElementById("scoreboard").style.display = "none";
-    player.position = new BABYLON.Vector3(0, 5, 0);
 
     clearInterval(timer);
     timer = setInterval(() => {
@@ -147,6 +174,5 @@ window.addEventListener("DOMContentLoaded", function () {
     if (data.type === "players") playersEl.textContent = data.count;
   };
 
-  // 🔓 Allow HTML button to call startGame()
   window.startGame = startGame;
 });
