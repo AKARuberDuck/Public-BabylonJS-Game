@@ -7,17 +7,16 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// ✅ Serve static files from ../public
+// Serve static files from ../public
 app.use(express.static(path.join(__dirname, "../public")));
 
-// ✅ Catch-all for browser routes (sends index.html)
+// Catch-all: serve index.html
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../public/index.html"));
 });
 
-// ✅ WebSocket logic (optional player counter)
+// WebSocket player count
 let clients = new Set();
-
 wss.on("connection", (ws) => {
   clients.add(ws);
   broadcast({ type: "players", count: clients.size });
@@ -30,11 +29,11 @@ wss.on("connection", (ws) => {
 
 function broadcast(data) {
   const message = JSON.stringify(data);
-  clients.forEach((ws) => {
+  for (const ws of clients) {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(message);
     }
-  });
+  }
 }
 
 const PORT = process.env.PORT || 3000;
