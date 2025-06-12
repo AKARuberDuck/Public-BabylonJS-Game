@@ -102,3 +102,100 @@ window.addEventListener("DOMContentLoaded", function () {
       }));
     }
     for (let i = 0; i < 8; i++) spawnPowerUp();
+    let challengeActive = false;
+    let challengeScore = 0;
+    function startMiniChallenge() {
+      challengeActive = true;
+      challengeScore = 0;
+      const msg = document.createElement("div");
+      msg.innerText = "⚡ Collect 3 orbs in 10s!";
+      msg.style.position = "absolute";
+      msg.style.top = "20px";
+      msg.style.left = "50%";
+      msg.style.transform = "translateX(-50%)";
+      msg.style.fontSize = "20px";
+      msg.style.color = "yellow";
+      msg.id = "challengeMsg";
+      document.body.appendChild(msg);
+
+      const end = () => {
+        challengeActive = false;
+        document.getElementById("challengeMsg")?.remove();
+      };
+
+      setTimeout(() => {
+        if (challengeScore >= 3) {
+          alert("🎯 Challenge completed! +3 bonus");
+          score += 3;
+        }
+        end();
+      }, 10000);
+    }
+
+    // Inside spawnPowerUp's onPickTrigger:
+    if (challengeActive) challengeScore++;
+    if (!challengeActive && Math.random() < 0.15) startMiniChallenge();
+  function submitScore(name, score) {
+    fetch("https://public-babylonjs-game.onrender.com/submit-score", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, score })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) console.log("✅ Score submitted!");
+      })
+      .catch(err => console.error("❌ Error submitting score:", err));
+  }
+
+  function fetchLeaderboard() {
+    fetch("https://raw.githubusercontent.com/AKARuberDuck/Public-BabylonJS-Game/main/public/highscores.json")
+      .then(res => res.json())
+      .then(data => {
+        const top5 = data.sort((a, b) => b.score - a.score).slice(0, 5);
+        leaderList.innerHTML = "";
+        top5.forEach(entry => {
+          const li = document.createElement("li");
+          li.textContent = `${entry.name} — ${entry.score}`;
+          leaderList.appendChild(li);
+        });
+        leaderBoardBox.style.display = "block";
+      });
+  }
+
+  function startGame() {
+    score = 0;
+    scoreEl.textContent = score;
+    gameTime = parseInt(document.getElementById("gameTime")?.value) || 30;
+    timeEl.textContent = gameTime;
+    nameOverlay.style.display = "none";
+    document.getElementById("scoreboard").style.display = "none";
+    leaderBoardBox.style.display = "none";
+    playerAnchor.position = new BABYLON.Vector3(0, 5, 0);
+
+    clearInterval(timer);
+    timer = setInterval(() => {
+      gameTime--;
+      timeEl.textContent = gameTime;
+
+      if (gameTime <= 0) {
+        clearInterval(timer);
+        timer = null;
+        finalScoreEl.textContent = score;
+        document.getElementById("scoreboard").style.display = "block";
+        submitScore(playerName, score);
+        fetchLeaderboard();
+      }
+    }, 1000);
+  }
+  createScene();
+  engine.runRenderLoop(() => scene.render());
+
+  ws = new WebSocket("wss://public-babylonjs-game.onrender.com");
+  ws.onmessage = msg => {
+    const data = JSON.parse(msg.data);
+    if (data.type === "players") playersEl.textContent = data.count;
+  };
+
+  window.startGame = startGame;
+});
