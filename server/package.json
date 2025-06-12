@@ -1,11 +1,13 @@
 {
-  "name": "babylonjs-multiplayer-server",
+  "name": "server",
   "version": "1.0.0",
+  "description": "Server for BabylonJS game",
   "main": "index.js",
-  "dependencies": {
-    "ws": "^8.0.0"
-  },
   "scripts": {
     "start": "node index.js"
-  }
+  },
+  "dependencies": {
+  "express": "^4.18.2",
+  "ws": "^8.13.0"
+}
 }
