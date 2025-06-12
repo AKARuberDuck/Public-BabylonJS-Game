@@ -13,7 +13,7 @@ window.addEventListener("DOMContentLoaded", function () {
     scene = new BABYLON.Scene(engine);
     scene.enablePhysics();
     scene.gravity = new BABYLON.Vector3(0, -0.5, 0);
-
+const music = new BABYLON.Sound(…);
     const camera = new BABYLON.ArcRotateCamera("camera", Math.PI / 2.5, Math.PI / 2.7, 30, BABYLON.Vector3.Zero(), scene);
     camera.attachControl(canvas, true);
     new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
@@ -111,3 +111,4 @@ window.addEventListener("DOMContentLoaded", function () {
         timer = null;
         finalScoreEl.textContent = score;
         document.getElementById("scoreboard").style.display = "block
+          window.startGame = startGame;
