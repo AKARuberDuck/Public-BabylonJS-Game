@@ -109,5 +109,5 @@ window.addEventListener("DOMContentLoaded", function () {
         clearInterval(timer);
         timer = null;
         finalScoreEl.textContent = score;
-        document.getElementById("scoreboard").style.display = "block
-          window.startGame = startGame;
+        document.getElementById("scoreboard").style.display = "block";
+window.startGame = startGame;
