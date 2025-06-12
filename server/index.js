@@ -10,26 +10,34 @@ const wss = new WebSocket.Server({ server });
 // Serve static files from /public
 app.use(express.static(path.join(__dirname, "../public")));
 
-// Fallback to index.html for client-side routing
+// Fallback route to index.html for any unknown path
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../public/index.html"));
 });
 
 // WebSocket logic
-wss.on("connection", (ws) => {
-  console.log("✅ New WebSocket connection");
+let clients = new Set();
 
-  ws.on("message", (msg) => {
-    console.log("Message from client:", msg.toString());
-    // You can choose to broadcast or respond here
-  });
+wss.on("connection", (ws) => {
+  clients.add(ws);
+  broadcast({ type: "players", count: clients.size });
 
   ws.on("close", () => {
-    console.log("🔌 WebSocket disconnected");
+    clients.delete(ws);
+    broadcast({ type: "players", count: clients.size });
   });
 });
 
-// Start the server
+function broadcast(message) {
+  const data = JSON.stringify(message);
+  for (let ws of clients) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(data);
+    }
+  }
+}
+
+// Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`🚀 Server + WebSocket running at http://localhost:${PORT}`);
