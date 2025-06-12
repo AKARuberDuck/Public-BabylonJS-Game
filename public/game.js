@@ -16,9 +16,9 @@ window.addEventListener("DOMContentLoaded", function () {
 
     const camera = new BABYLON.ArcRotateCamera("camera", Math.PI / 2.5, Math.PI / 2.7, 30, BABYLON.Vector3.Zero(), scene);
     camera.attachControl(canvas, true);
-    const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+    new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
 
-    // 🌄 Textured ground (CDN-based)
+    // 🌄 Textured Ground
     const ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 20, height: 20, subdivisions: 50 }, scene);
     const groundMat = new BABYLON.StandardMaterial("groundMat", scene);
     groundMat.diffuseTexture = new BABYLON.Texture("https://assets.babylonjs.com/environments/ground.jpg", scene);
@@ -27,26 +27,26 @@ window.addEventListener("DOMContentLoaded", function () {
     ground.material = groundMat;
     ground.physicsImpostor = new BABYLON.PhysicsImpostor(ground, BABYLON.PhysicsImpostor.BoxImpostor, { mass: 0 }, scene);
 
-    // 🎶 Background music via SoundHelix CDN
+    // 🎧 Background Music (from CDN)
     const music = new BABYLON.Sound(
-      "backgroundMusic",
+      "bgMusic",
       "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
       scene,
       null,
-      { loop: true, autoplay: true, volume: 0.3 }
+      { autoplay: true, loop: true, volume: 0.3 }
     );
     window.addEventListener("click", () => {
       if (!music.isPlaying) music.play();
     });
 
-    // 🧍 Player setup
+    // 🧍 Player
     player = BABYLON.MeshBuilder.CreateSphere("player", { diameter: 2 }, scene);
     player.position = new BABYLON.Vector3(0, 5, 0);
     player.physicsImpostor = new BABYLON.PhysicsImpostor(player, BABYLON.PhysicsImpostor.SphereImpostor, {
       mass: 1, restitution: 0.2
     }, scene);
 
-    // 🎯 Goal zone
+    // 🎯 Goal Zone
     goalZone = BABYLON.MeshBuilder.CreateDisc("goal", { radius: 2, tessellation: 32 }, scene);
     goalZone.rotation.x = Math.PI / 2;
     goalZone.position = new BABYLON.Vector3(6, 0.05, -6);
@@ -54,7 +54,7 @@ window.addEventListener("DOMContentLoaded", function () {
     goalMat.diffuseColor = new BABYLON.Color3(0.2, 1, 0.2);
     goalZone.material = goalMat;
 
-    // 🎮 Player input
+    // 🎮 Controls
     const input = { up: false, down: false, left: false, right: false };
     window.addEventListener("keydown", (e) => {
       if (e.code === "ArrowUp") input.up = true;
@@ -70,11 +70,11 @@ window.addEventListener("DOMContentLoaded", function () {
       if (e.code === "ArrowRight") input.right = false;
     });
 
-    // 🔁 Physics + scoring loop
+    // 🔁 Game loop: movement + scoring
     scene.onBeforeRenderObservable.add(() => {
       if (timer) {
         const force = 3;
-        let dir = new BABYLON.Vector3(
+        const dir = new BABYLON.Vector3(
           (input.right ? 1 : 0) - (input.left ? 1 : 0),
           0,
           (input.down ? 1 : 0) - (input.up ? 1 : 0)
@@ -83,4 +83,31 @@ window.addEventListener("DOMContentLoaded", function () {
           player.physicsImpostor.applyImpulse(dir.normalize().scale(force), player.getAbsolutePosition());
         }
 
-        const dist
+        const dist = BABYLON.Vector3.Distance(player.position, goalZone.position);
+        if (dist < 2.5) {
+          score++;
+          scoreEl.textContent = score;
+          player.position = new BABYLON.Vector3(0, 5, 0);
+        }
+      }
+    });
+  }
+
+  function startGame() {
+    score = 0;
+    scoreEl.textContent = score;
+    gameTime = parseInt(document.getElementById("gameTime").value) || 30;
+    timeEl.textContent = gameTime;
+    nameOverlay.style.display = "none";
+    document.getElementById("scoreboard").style.display = "none";
+    player.position = new BABYLON.Vector3(0, 5, 0);
+
+    clearInterval(timer);
+    timer = setInterval(() => {
+      gameTime--;
+      timeEl.textContent = gameTime;
+      if (gameTime <= 0) {
+        clearInterval(timer);
+        timer = null;
+        finalScoreEl.textContent = score;
+        document.getElementById("scoreboard").style.display = "block
