@@ -152,3 +152,79 @@ window.addEventListener("DOMContentLoaded", function () {
       }
     });
   }
+  function startGame() {
+    score = 0;
+    scoreEl.textContent = score;
+    gameTime = parseInt(document.getElementById("gameTime")?.value) || 30;
+    timeEl.textContent = gameTime;
+    nameOverlay.style.display = "none";
+    document.getElementById("scoreboard").style.display = "none";
+    playerAnchor.position = new BABYLON.Vector3(0, 5, 0);
+
+    clearInterval(timer);
+    timer = setInterval(() => {
+      gameTime--;
+      timeEl.textContent = gameTime;
+      if (gameTime <= 0) {
+        clearInterval(timer);
+        timer = null;
+        finalScoreEl.textContent = score;
+        document.getElementById("scoreboard").style.display = "block";
+        submitScoreToGitHub(playerName, score);
+        fetchLeaderboard(); // optional display
+      }
+    }, 1000);
+  }
+  const GITHUB_API_URL = "https://api.github.com/repos/AKARuberDuck/Public-BabylonJS-Game/contents/public/highscores.json";
+  const GITHUB_TOKEN = "ghp_your_personal_access_token_here"; // 🔐 Replace this safely or proxy it!
+
+  function submitScoreToGitHub(name, scoreValue) {
+    fetch(GITHUB_API_URL, {
+      headers: {
+        Authorization: `Bearer ${GITHUB_TOKEN}`,
+        Accept: "application/vnd.github.v3+json"
+      }
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const currentScores = JSON.parse(atob(data.content));
+        currentScores.push({ name, score: scoreValue });
+        const updated = btoa(JSON.stringify(currentScores, null, 2));
+
+        return fetch(GITHUB_API_URL, {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${GITHUB_TOKEN}`,
+            Accept: "application/vnd.github.v3+json"
+          },
+          body: JSON.stringify({
+            message: `Add score: ${name} - ${scoreValue}`,
+            content: updated,
+            sha: data.sha
+          })
+        });
+      })
+      .then(() => console.log("Score submitted to GitHub"))
+      .catch(err => console.error("GitHub submission failed:", err));
+  }
+
+  function fetchLeaderboard() {
+    fetch("https://raw.githubusercontent.com/AKARuberDuck/Public-BabylonJS-Game/main/public/highscores.json")
+      .then((res) => res.json())
+      .then((scores) => {
+        const top = scores.sort((a, b) => b.score - a.score).slice(0, 5);
+        console.table(top);
+        // Optionally: render to your scoreboard UI
+      });
+  }
+  createScene();
+  engine.runRenderLoop(() => scene.render());
+
+  ws = new WebSocket("wss://public-babylonjs-game.onrender.com");
+  ws.onmessage = (msg) => {
+    const data = JSON.parse(msg.data);
+    if (data.type === "players") playersEl.textContent = data.count;
+  };
+
+  window.startGame = startGame;
+});
