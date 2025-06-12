@@ -13,26 +13,47 @@ window.addEventListener("DOMContentLoaded", function () {
     scene = new BABYLON.Scene(engine);
     scene.enablePhysics();
     scene.gravity = new BABYLON.Vector3(0, -0.5, 0);
-    const camera = new BABYLON.ArcRotateCamera("camera", Math.PI / 2.5, Math.PI / 2.7, 30, BABYLON.Vector3.Zero(), scene);
+
+    const camera = new BABYLON.ArcRotateCamera(
+      "camera",
+      Math.PI / 2.5,
+      Math.PI / 2.7,
+      30,
+      BABYLON.Vector3.Zero(),
+      scene
+    );
     camera.attachControl(canvas, true);
+
     new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
 
-    // 🌄 Textured Ground
-    const ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 20, height: 20, subdivisions: 50 }, scene);
+    // 🌄 Ground
+    const ground = BABYLON.MeshBuilder.CreateGround(
+      "ground",
+      { width: 20, height: 20, subdivisions: 50 },
+      scene
+    );
     const groundMat = new BABYLON.StandardMaterial("groundMat", scene);
-    groundMat.diffuseTexture = new BABYLON.Texture("https://assets.babylonjs.com/environments/ground.jpg", scene);
+    groundMat.diffuseTexture = new BABYLON.Texture(
+      "https://assets.babylonjs.com/environments/ground.jpg",
+      scene
+    );
     groundMat.diffuseTexture.uScale = 4;
     groundMat.diffuseTexture.vScale = 4;
     ground.material = groundMat;
-    ground.physicsImpostor = new BABYLON.PhysicsImpostor(ground, BABYLON.PhysicsImpostor.BoxImpostor, { mass: 0 }, scene);
+    ground.physicsImpostor = new BABYLON.PhysicsImpostor(
+      ground,
+      BABYLON.PhysicsImpostor.BoxImpostor,
+      { mass: 0 },
+      scene
+    );
 
-    // 🎧 Background Music (from CDN)
+    // 🎵 Music
     const music = new BABYLON.Sound(
       "bgMusic",
       "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
       scene,
       null,
-      { autoplay: true, loop: true, volume: 0.3 }
+      { loop: true, autoplay: true, volume: 0.3 }
     );
     window.addEventListener("click", () => {
       if (!music.isPlaying) music.play();
@@ -41,11 +62,14 @@ window.addEventListener("DOMContentLoaded", function () {
     // 🧍 Player
     player = BABYLON.MeshBuilder.CreateSphere("player", { diameter: 2 }, scene);
     player.position = new BABYLON.Vector3(0, 5, 0);
-    player.physicsImpostor = new BABYLON.PhysicsImpostor(player, BABYLON.PhysicsImpostor.SphereImpostor, {
-      mass: 1, restitution: 0.2
-    }, scene);
+    player.physicsImpostor = new BABYLON.PhysicsImpostor(
+      player,
+      BABYLON.PhysicsImpostor.SphereImpostor,
+      { mass: 1, restitution: 0.2 },
+      scene
+    );
 
-    // 🎯 Goal Zone
+    // 🎯 Goal
     goalZone = BABYLON.MeshBuilder.CreateDisc("goal", { radius: 2, tessellation: 32 }, scene);
     goalZone.rotation.x = Math.PI / 2;
     goalZone.position = new BABYLON.Vector3(6, 0.05, -6);
@@ -69,7 +93,7 @@ window.addEventListener("DOMContentLoaded", function () {
       if (e.code === "ArrowRight") input.right = false;
     });
 
-    // 🔁 Game loop: movement + scoring
+    // 🔁 Game loop
     scene.onBeforeRenderObservable.add(() => {
       if (timer) {
         const force = 3;
@@ -110,4 +134,19 @@ window.addEventListener("DOMContentLoaded", function () {
         timer = null;
         finalScoreEl.textContent = score;
         document.getElementById("scoreboard").style.display = "block";
-window.startGame = startGame;
+      }
+    }, 1000);
+  }
+
+  createScene();
+  engine.runRenderLoop(() => scene.render());
+
+  ws = new WebSocket("wss://public-babylonjs-game.onrender.com");
+  ws.onmessage = (msg) => {
+    const data = JSON.parse(msg.data);
+    if (data.type === "players") playersEl.textContent = data.count;
+  };
+
+  // 🔓 Allow HTML button to call startGame()
+  window.startGame = startGame;
+});
