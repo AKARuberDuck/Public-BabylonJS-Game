@@ -122,3 +122,23 @@ window.addEventListener("DOMContentLoaded", function () {
   // 🕹️ Expose startGame globally for button
   window.startGame = startGame;
 });
+    player.position = new BABYLON.Vector3(0, 5, 0);
+  }
+
+  createScene();
+  engine.runRenderLoop(() => {
+    scene.render();
+  });
+
+  // 🌐 Multiplayer connection
+  ws = new WebSocket("wss://public-babylonjs-game.onrender.com");
+  ws.onmessage = (msg) => {
+    const data = JSON.parse(msg.data);
+    if (data.type === "players") {
+      playersEl.textContent = data.count;
+    }
+  };
+
+  // 🟢 Attach startGame to window for HTML button
+  window.startGame = startGame;
+});
